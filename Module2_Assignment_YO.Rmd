@@ -1,0 +1,184 @@
+---
+title: "Module2_Assignment_YO"
+author: "Yuki Obayashi"
+date: "2025-01-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading and preprocessing the data
+
+```{r, echo = TRUE}
+library(readr)
+activity <- read_csv("activity.csv")
+```
+
+# What is mean total number of steps taken per day?
+
+## Calculate the total number of steps taken per day
+```{r, echo = TRUE}
+library(tidyverse)
+total_steps_per_date <- activity %>% 
+  group_by(date) %>% 
+  summarize(total_steps = sum(steps, na.rm = TRUE))
+
+print(total_steps_per_date)
+
+```
+## Make a histogram of the total number of steps taken each day
+The main difference between histogram and bar graph is whether the x axis is continuous or categorical.
+In this assignment, the x axis is date. Although date is a continuous variable, it should be categorized as categorical in R plotting. Therefore, I used geom_bar() in the following code.
+
+```{r, echo = TRUE}
+library(dplyr)
+library(ggplot2)
+
+ggplot(total_steps_per_date, aes(x = date, y = total_steps)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Total Steps Per Day", x = "Date", y = "Total Steps") +
+  theme_minimal()
+
+```
+
+## Calculate and report the mean and median of the total number of steps taken per day
+
+```{r, echo = TRUE}
+activity %>% 
+  group_by(date) %>% 
+  summarize(total_steps_mean = mean(steps, na.rm = TRUE),
+            total_steps_median = median(steps, na.rm = TRUE))
+
+```
+
+# What is the average daily activity pattern?
+
+## Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r}
+activity_time_series <- activity %>%
+  group_by(interval) %>%
+  summarize(average_steps = mean(steps, na.rm = TRUE))
+
+ggplot(activity_time_series, aes(x = interval, y = average_steps)) +
+  geom_line() +  
+  labs(title = "Average Daily Activity Pattern",
+       x = "5-Minute Interval", 
+       y = "Average Number of Steps") +
+  theme_minimal()
+
+```
+
+## Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+activity_time_series %>%
+  filter(average_steps == max(average_steps, na.rm = TRUE))
+
+```
+The answer is 8:35.
+
+
+# Imputing missing values
+
+## Calculate and report the total number of missing values in the dataset
+
+```{r}
+missing_rows <- activity %>% filter(is.na(steps))
+nrow(missing_rows)
+```
+
+## Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated.
+In addition to using the mean/median for that day, or the mean for that 5-minute interval, other option includes to use preceding or succeeding values.
+
+## Create a new dataset that is equal to the original dataset but with the missing data filled in.
+Here, I try to fill in the missing values using the mean for that day.
+If all the steps in that day are missing, I filled it as 0.
+
+```{r}
+
+activity_filled <- activity %>% 
+  group_by(date) %>% 
+  mutate(steps = ifelse(is.na(steps), coalesce(mean(steps, na.rm = TRUE), 0), steps))
+print(activity_filled)
+
+```
+
+## Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. 
+
+```{r}
+
+total_steps_per_date_filled <- activity_filled %>% 
+  group_by(date) %>% 
+  summarize(total_steps = sum(steps, na.rm = TRUE))
+
+#Histgram
+ggplot(total_steps_per_date_filled, aes(x = date, y = total_steps)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Total Steps Per Day", x = "Date", y = "Total Steps") +
+  theme_minimal()
+
+#Mean and median
+activity_filled %>% 
+  group_by(date) %>% 
+  summarize(total_steps_mean = mean(steps, na.rm = TRUE),
+            total_steps_median = median(steps, na.rm = TRUE))
+
+
+```
+
+As long as I adopt the strategy to fill the missing values in 0, the results are similar.
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+## Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+
+activity_weekday <- activity %>% 
+  mutate(weekday = weekdays(date)) %>% 
+  mutate(weekday_or_end = ifelse(weekday %in% c("Saturday", "Sunday"), "weekend", "weekday"))
+
+print(activity_weekday)
+
+
+```
+
+## Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r}
+#weekday
+activity_time_series_weekday <- activity_weekday %>%
+  filter(weekday_or_end=="weekday") %>% 
+  group_by(interval) %>%
+  summarize(average_steps = mean(steps, na.rm = TRUE))
+
+plot_weekday <- ggplot(activity_time_series_weekday, aes(x = interval, y = average_steps)) +
+  geom_line() +  
+  labs(title = "Average Daily Activity Pattern (weekday)",
+       x = "5-Minute Interval", 
+       y = "Average Number of Steps") +
+  theme_minimal()
+
+#weekend
+activity_time_series_weekend <- activity_weekday %>%
+  filter(weekday_or_end=="weekend") %>% 
+  group_by(interval) %>%
+  summarize(average_steps = mean(steps, na.rm = TRUE))
+
+plot_weekend <- ggplot(activity_time_series_weekend, aes(x = interval, y = average_steps)) +
+  geom_line() +  
+  labs(title = "Average Daily Activity Pattern (weekend)",
+       x = "5-Minute Interval", 
+       y = "Average Number of Steps") +
+  theme_minimal()
+
+#Arrange
+library(gridExtra)
+grid.arrange(plot_weekday, plot_weekend, ncol = 2)
+
+```
+
+In weekends, the total number of steps increases in the afternoon.
